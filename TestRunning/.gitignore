@@ -1,0 +1,17 @@
+/Library/
+/Temp/
+/Obj/
+/Logs/
+/UserSettings/
+/.vs/
+/.vscode/
+/Build/
+/Builds/
+/MemoryCaptures/
+/Recordings/
+
+*.csproj
+*.sln
+*.user
+*.tmp
+*.mp4
