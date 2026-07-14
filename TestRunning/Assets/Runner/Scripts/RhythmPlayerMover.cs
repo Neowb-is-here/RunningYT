@@ -50,12 +50,10 @@ namespace HyperCasual.Runner
         Follower[] m_Followers;
 
         Transform m_Transform;
-        int m_CurrentLane = 1;
 
         void Awake()
         {
             m_Transform = transform;
-            m_CurrentLane = GetClosestLane(m_Transform.position.x);
         }
 
         void OnValidate()
@@ -84,10 +82,9 @@ namespace HyperCasual.Runner
             float deltaTime = Time.deltaTime;
 
             nextPosition.z += m_ForwardSpeed * deltaTime;
-            UpdateTargetLane();
             nextPosition.x = Mathf.MoveTowards(
                 nextPosition.x,
-                GetLaneX(m_CurrentLane),
+                GetTargetX(),
                 m_LaneMoveSpeed * deltaTime);
             nextPosition.y = Mathf.MoveTowards(
                 nextPosition.y,
@@ -110,56 +107,23 @@ namespace HyperCasual.Runner
             return m_StandingY;
         }
 
-        void UpdateTargetLane()
+        float GetTargetX()
         {
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
-                return;
+                return m_CenterSnapX;
             }
 
-            bool snapLeft = keyboard.aKey.wasPressedThisFrame || keyboard.leftArrowKey.wasPressedThisFrame;
-            bool snapRight = keyboard.dKey.wasPressedThisFrame || keyboard.rightArrowKey.wasPressedThisFrame;
+            bool moveLeft = keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed;
+            bool moveRight = keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed;
 
-            if (snapLeft == snapRight)
+            if (moveLeft == moveRight)
             {
-                return;
+                return m_CenterSnapX;
             }
 
-            m_CurrentLane += snapLeft ? -1 : 1;
-            m_CurrentLane = Mathf.Clamp(m_CurrentLane, 0, 2);
-        }
-
-        float GetLaneX(int lane)
-        {
-            switch (lane)
-            {
-                case 0:
-                    return m_LeftSnapX;
-                case 2:
-                    return m_RightSnapX;
-                default:
-                    return m_CenterSnapX;
-            }
-        }
-
-        int GetClosestLane(float xPosition)
-        {
-            float leftDistance = Mathf.Abs(xPosition - m_LeftSnapX);
-            float centerDistance = Mathf.Abs(xPosition - m_CenterSnapX);
-            float rightDistance = Mathf.Abs(xPosition - m_RightSnapX);
-
-            if (leftDistance < centerDistance && leftDistance < rightDistance)
-            {
-                return 0;
-            }
-
-            if (rightDistance < centerDistance)
-            {
-                return 2;
-            }
-
-            return 1;
+            return moveLeft ? m_LeftSnapX : m_RightSnapX;
         }
 
         void MoveFollowers(Vector3 delta)
