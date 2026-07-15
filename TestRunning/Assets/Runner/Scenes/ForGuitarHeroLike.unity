@@ -12352,7 +12352,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!65 &432761551
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -18018,7 +18018,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 614052767}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.092, z: 120.7}
+  m_LocalPosition: {x: 0, y: 0.092, z: 120.86}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -20133,6 +20133,7 @@ MonoBehaviour:
   m_StandingY: 0
   m_LeftShiftY: -0.3
   m_HeightMoveSpeed: 4
+  m_MoveOnStart: 1
   m_MoveFollowersWithPlayer: 1
   m_Followers:
   - Target: {fileID: 934149471}
@@ -23737,6 +23738,12 @@ MonoBehaviour:
   m_DisappearEffectLifetime: 0.5
   m_ParentDisappearEffectToIndicator: 1
   m_ForceEffectLocalSimulationSpace: 1
+  m_ResolveAudioSource: {fileID: 0}
+  m_ResolveSound: {fileID: 8300000, guid: cd1073ce961ba44469e55e15aa62190c, type: 3}
+  m_ResolveSoundVolume: 10
+  m_ResolveSoundStartOffset: 1
+  m_EarlyResolveSoundDistance: 0.8
+  m_ResolvePitchVariance: 0
   m_ShakeOnResolve: 1
   m_ShakeDuration: 0.12
   m_ShakeStrength: 0.06
@@ -26001,7 +26008,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!65 &874757816
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -27492,7 +27499,7 @@ Transform:
   m_GameObject: {fileID: 923597267}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -0.49, y: 0.398, z: 128.07}
-  m_LocalScale: {x: 1, y: 1, z: 5.2005}
+  m_LocalScale: {x: 1, y: 1, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 614052768}
@@ -31196,11 +31203,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_AudioSource: {fileID: 0}
-  m_MusicClip: {fileID: 8300000, guid: 097b09e638232d44fb0bffcccd0cc4f6, type: 3}
+  m_MusicClip: {fileID: 8300000, guid: 554bb70ca0c7ff449bcbe7be03ff9600, type: 3}
+  m_MusicVolume: 1
   m_PlayOnStart: 1
   m_PlayMusicWhenStarted: 1
   m_RestartMusicOnEnable: 1
-  m_Bpm: 157
+  m_UseScheduledMusicStart: 1
+  m_MusicStartDelay: 0.5
+  m_SchedulePlayerMovementWithMusic: 1
+  m_Bpm: 156
   m_BeatsBeforeHit: 1
   m_FirstBeatOffset: 0
   m_StartBeatIndex: 0
@@ -31222,47 +31233,436 @@ MonoBehaviour:
   m_ResolveDistance: 10
   m_PreSpawnOnStart: 1
   m_PreSpawnBeatCount: 0
-  m_PreSpawnStartDistance: 39
+  m_PreSpawnStartDistance: 39.2
   m_PreSpawnBeatSpacing: 1.91
+  m_UseBeatTimingForPreSpawnLayout: 1
+  m_RhythmPlayerMover: {fileID: 673572078}
+  m_PreSpawnForwardSpeed: 6
   m_DefaultKeyCount: 1
   m_DefaultCopyOffset: {x: 0.6, y: 0, z: 0}
   m_ChordPattern:
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
   - 1001
-  - 0000
-  - 0000
-  - 0000
   - 0110
-  - 0000
-  - 0000
-  - 0000
-  - 1000
-  - 0000
-  - 0000
-  - 0000
-  - 0001
-  - 0000
-  - 0000
-  - 0000
-  - 0110
-  - 0000
-  - 0000
-  - 0000
-  - 0000
-  - 0000
-  - 0000
-  - 0000
-  - 0000
-  - 0000
-  - 0011
-  - 0000
-  - 0000
-  - 0000
-  - 0110
-  - 0000
-  - 1100
-  - 0000
-  - 0000
-  - 0000
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
+  - 1111
   - 1111
   - 1111
   - 1111
@@ -31516,6 +31916,12 @@ MonoBehaviour:
   m_DisappearEffectLifetime: 0.5
   m_ParentDisappearEffectToIndicator: 1
   m_ForceEffectLocalSimulationSpace: 1
+  m_ResolveAudioSource: {fileID: 0}
+  m_ResolveSound: {fileID: 8300000, guid: cd1073ce961ba44469e55e15aa62190c, type: 3}
+  m_ResolveSoundVolume: 10
+  m_ResolveSoundStartOffset: 1
+  m_EarlyResolveSoundDistance: 0.8
+  m_ResolvePitchVariance: 0
   m_ShakeOnResolve: 1
   m_ShakeDuration: 0.12
   m_ShakeStrength: 0.06
@@ -33079,7 +33485,7 @@ Transform:
   m_GameObject: {fileID: 1094377469}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0.49, y: 0.398, z: 139.39}
-  m_LocalScale: {x: 1, y: 1, z: 5.2005}
+  m_LocalScale: {x: 1, y: 1, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 614052768}
@@ -33176,7 +33582,7 @@ Transform:
   m_GameObject: {fileID: 1096258552}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.48024845, y: 0.17885898, z: 5.2005}
+  m_LocalScale: {x: 0.48024845, y: 0.17885898, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1813248789}
@@ -34339,7 +34745,7 @@ Transform:
   m_GameObject: {fileID: 1131180533}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 1.96, y: 0, z: 0}
-  m_LocalScale: {x: 0.48024845, y: 0.17885898, z: 5.2005}
+  m_LocalScale: {x: 0.48024845, y: 0.17885898, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1813248789}
@@ -40560,8 +40966,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1323873740}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.49, y: 0.398, z: -38.18}
-  m_LocalScale: {x: 1, y: 1, z: 5.2005}
+  m_LocalPosition: {x: -0.49, y: 0.398, z: -96.72}
+  m_LocalScale: {x: 1, y: 1, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 614052768}
@@ -49529,8 +49935,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1605526059}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.49, y: 0.398, z: 82.79}
-  m_LocalScale: {x: 1, y: 1, z: 5.2005}
+  m_LocalPosition: {x: -0.49, y: 0.398, z: 1.92}
+  m_LocalScale: {x: 1, y: 1, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 614052768}
@@ -50439,6 +50845,12 @@ MonoBehaviour:
   m_DisappearEffectLifetime: 0.5
   m_ParentDisappearEffectToIndicator: 1
   m_ForceEffectLocalSimulationSpace: 1
+  m_ResolveAudioSource: {fileID: 0}
+  m_ResolveSound: {fileID: 8300000, guid: cd1073ce961ba44469e55e15aa62190c, type: 3}
+  m_ResolveSoundVolume: 10
+  m_ResolveSoundStartOffset: 1
+  m_EarlyResolveSoundDistance: 0.8
+  m_ResolvePitchVariance: 0
   m_ShakeOnResolve: 1
   m_ShakeDuration: 0.12
   m_ShakeStrength: 0.06
@@ -52160,8 +52572,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1682632351}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.49, y: 0.398, z: 105.43}
-  m_LocalScale: {x: 1, y: 1, z: 5.2005}
+  m_LocalPosition: {x: -0.49, y: 0.398, z: 21}
+  m_LocalScale: {x: 1, y: 1, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 614052768}
@@ -52300,8 +52712,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1688422557}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.49, y: 0.398, z: 116.75}
-  m_LocalScale: {x: 1, y: 1, z: 5.2005}
+  m_LocalPosition: {x: 0.49, y: 0.398, z: 30.6}
+  m_LocalScale: {x: 1, y: 1, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 614052768}
@@ -55193,7 +55605,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1813248788}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.98, y: 0, z: -8.639999}
+  m_LocalPosition: {x: -0.98, y: 0, z: -15.25}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -58499,8 +58911,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1939345628}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.49, y: 0.398, z: 94.11}
-  m_LocalScale: {x: 1, y: 1, z: 5.2005}
+  m_LocalPosition: {x: 0.49, y: 0.398, z: 11.49}
+  m_LocalScale: {x: 1, y: 1, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 614052768}
@@ -60653,6 +61065,12 @@ MonoBehaviour:
   m_DisappearEffectLifetime: 0.5
   m_ParentDisappearEffectToIndicator: 1
   m_ForceEffectLocalSimulationSpace: 1
+  m_ResolveAudioSource: {fileID: 0}
+  m_ResolveSound: {fileID: 8300000, guid: cd1073ce961ba44469e55e15aa62190c, type: 3}
+  m_ResolveSoundVolume: 10
+  m_ResolveSoundStartOffset: 1
+  m_EarlyResolveSoundDistance: 0.8
+  m_ResolvePitchVariance: 0
   m_ShakeOnResolve: 1
   m_ShakeDuration: 0.12
   m_ShakeStrength: 0.06
@@ -63548,8 +63966,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2088292263}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.49, y: 0.398, z: -26.7}
-  m_LocalScale: {x: 1, y: 1, z: 5.2005}
+  m_LocalPosition: {x: 0.49, y: 0.398, z: -89.03}
+  m_LocalScale: {x: 1, y: 1, z: 4.112865}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 614052768}

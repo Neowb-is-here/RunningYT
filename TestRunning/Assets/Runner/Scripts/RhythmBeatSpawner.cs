@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace HyperCasual.Runner
 {
@@ -30,6 +31,9 @@ namespace HyperCasual.Runner
         [SerializeField]
         AudioClip m_MusicClip;
 
+        [SerializeField, Min(0.0f)]
+        float m_MusicVolume = 1.0f;
+
         [SerializeField]
         bool m_PlayOnStart = true;
 
@@ -38,6 +42,16 @@ namespace HyperCasual.Runner
 
         [SerializeField]
         bool m_RestartMusicOnEnable = true;
+
+        [Header("Start Sync")]
+        [SerializeField]
+        bool m_UseScheduledMusicStart = true;
+
+        [SerializeField, Min(0.0f), Tooltip("Seconds to wait before scheduled music playback starts. Gives the scene time to settle before timing begins.")]
+        float m_MusicStartDelay = 0.5f;
+
+        [SerializeField, Tooltip("If a Rhythm Player Mover is assigned, hold movement until the scheduled music start time.")]
+        bool m_SchedulePlayerMovementWithMusic = true;
 
         [Header("Beat Timing")]
         [SerializeField, Min(1.0f)]
@@ -93,11 +107,21 @@ namespace HyperCasual.Runner
         [SerializeField, Min(0), Tooltip("How many beat rows to pre-spawn. Use 0 to use the active pattern length.")]
         int m_PreSpawnBeatCount;
 
-        [SerializeField, Min(0.0f), Tooltip("Distance from each indicator to the first pre-spawned beat row.")]
+        [SerializeField, Min(0.0f), Tooltip("Manual distance from each indicator to the first pre-spawned beat row. Used when beat timing layout is disabled.")]
         float m_PreSpawnStartDistance = 12.0f;
 
-        [SerializeField, Min(0.01f), Tooltip("Distance between pre-spawned beat rows. For BPM synced placement, use player forward speed * 60 / BPM.")]
+        [SerializeField, Min(0.01f), Tooltip("Manual distance between pre-spawned beat rows. Used when beat timing layout is disabled.")]
         float m_PreSpawnBeatSpacing = 2.0f;
+
+        [FormerlySerializedAs("m_UseBpmForPreSpawnSpacing")]
+        [SerializeField, Tooltip("Place pre-spawned rows from Beat Timing and forward speed. This makes BPM, Beats Before Hit, First Beat Offset, and Start Beat Index affect the layout.")]
+        bool m_UseBeatTimingForPreSpawnLayout = true;
+
+        [SerializeField, Tooltip("Optional player mover used to read the actual forward speed for beat-timed pre-spawn layout.")]
+        RhythmPlayerMover m_RhythmPlayerMover;
+
+        [SerializeField, Min(0.0f), Tooltip("Used for beat-timed pre-spawn layout when no Rhythm Player Mover is assigned.")]
+        float m_PreSpawnForwardSpeed = 6.0f;
 
         [SerializeField, Min(1), Tooltip("How many copies to spawn on the same beat when a detailed pattern step does not override it.")]
         int m_DefaultKeyCount = 1;
@@ -131,6 +155,9 @@ namespace HyperCasual.Runner
         int m_NextHitBeatIndex;
         int m_SpawnedBeatCount;
         float m_RuntimeStartTime;
+        float m_ScheduledSongTimeOffset;
+        double m_ScheduledStartDspTime;
+        bool m_UseDspSongTime;
         bool m_HasFinishedPattern;
         bool m_IsRunning;
 
@@ -141,6 +168,7 @@ namespace HyperCasual.Runner
         void Awake()
         {
             ResolveAudioSource();
+            ResolveRhythmPlayerMover();
         }
 
         void OnEnable()
@@ -156,6 +184,8 @@ namespace HyperCasual.Runner
         void OnValidate()
         {
             m_Bpm = Mathf.Max(1.0f, m_Bpm);
+            m_MusicVolume = Mathf.Max(0.0f, m_MusicVolume);
+            m_MusicStartDelay = Mathf.Max(0.0f, m_MusicStartDelay);
             m_BeatsBeforeHit = Mathf.Max(0, m_BeatsBeforeHit);
             m_StartBeatIndex = Mathf.Max(0, m_StartBeatIndex);
             m_MaxSpawnedBeats = Mathf.Max(0, m_MaxSpawnedBeats);
@@ -164,6 +194,7 @@ namespace HyperCasual.Runner
             m_PreSpawnBeatCount = Mathf.Max(0, m_PreSpawnBeatCount);
             m_PreSpawnStartDistance = Mathf.Max(0.0f, m_PreSpawnStartDistance);
             m_PreSpawnBeatSpacing = Mathf.Max(0.01f, m_PreSpawnBeatSpacing);
+            m_PreSpawnForwardSpeed = Mathf.Max(0.0f, m_PreSpawnForwardSpeed);
             m_DefaultKeyCount = Mathf.Max(1, m_DefaultKeyCount);
             m_PreviewMarkerSize = Mathf.Max(0.01f, m_PreviewMarkerSize);
 
@@ -208,6 +239,7 @@ namespace HyperCasual.Runner
 
         public void StartRhythm()
         {
+            ResolveRhythmPlayerMover();
             ResetSpawnSchedule();
             m_IsRunning = true;
 
@@ -224,6 +256,8 @@ namespace HyperCasual.Runner
             else
             {
                 m_RuntimeStartTime = Time.time;
+                m_UseDspSongTime = false;
+                StartPlayerMovementNow();
             }
         }
 
@@ -231,6 +265,7 @@ namespace HyperCasual.Runner
         {
             m_IsRunning = false;
             StopMusic();
+            StopPlayerMovement();
         }
 
         public void PlayMusic()
@@ -248,16 +283,36 @@ namespace HyperCasual.Runner
 
             if (m_AudioSource.clip == null)
             {
+                m_RuntimeStartTime = Time.time;
+                m_UseDspSongTime = false;
+                StartPlayerMovementNow();
                 return;
             }
+
+            m_AudioSource.volume = m_MusicVolume;
 
             if (m_RestartMusicOnEnable)
             {
                 m_AudioSource.time = 0.0f;
             }
 
-            m_RuntimeStartTime = Time.time;
+            m_ScheduledSongTimeOffset = m_AudioSource.time;
+
+            if (m_UseScheduledMusicStart)
+            {
+                m_ScheduledStartDspTime = AudioSettings.dspTime + m_MusicStartDelay;
+                m_RuntimeStartTime = Time.time + m_MusicStartDelay - m_ScheduledSongTimeOffset;
+                m_UseDspSongTime = true;
+
+                m_AudioSource.PlayScheduled(m_ScheduledStartDspTime);
+                SchedulePlayerMovement(m_ScheduledStartDspTime);
+                return;
+            }
+
+            m_RuntimeStartTime = Time.time - m_ScheduledSongTimeOffset;
+            m_UseDspSongTime = false;
             m_AudioSource.Play();
+            StartPlayerMovementNow();
         }
 
         public void StopMusic()
@@ -266,6 +321,8 @@ namespace HyperCasual.Runner
             {
                 m_AudioSource.Stop();
             }
+
+            m_UseDspSongTime = false;
         }
 
         void ResolveAudioSource()
@@ -281,11 +338,24 @@ namespace HyperCasual.Runner
             }
         }
 
+        void ResolveRhythmPlayerMover()
+        {
+            if (m_RhythmPlayerMover != null)
+            {
+                return;
+            }
+
+            m_RhythmPlayerMover = FindObjectOfType<RhythmPlayerMover>();
+        }
+
         void ResetSpawnSchedule()
         {
             m_NextHitBeatIndex = m_StartBeatIndex + m_BeatsBeforeHit;
             m_SpawnedBeatCount = 0;
             m_RuntimeStartTime = Time.time;
+            m_ScheduledSongTimeOffset = 0.0f;
+            m_ScheduledStartDspTime = 0.0;
+            m_UseDspSongTime = false;
             m_HasFinishedPattern = false;
             m_IsRunning = false;
         }
@@ -312,12 +382,48 @@ namespace HyperCasual.Runner
 
         float GetSongTime()
         {
-            if (m_AudioSource != null && m_AudioSource.clip != null)
+            if (m_UseDspSongTime)
+            {
+                float dspSongTime = m_ScheduledSongTimeOffset + (float)(AudioSettings.dspTime - m_ScheduledStartDspTime);
+                return Mathf.Max(0.0f, dspSongTime);
+            }
+
+            if (m_AudioSource != null && m_AudioSource.clip != null && m_AudioSource.isPlaying)
             {
                 return m_AudioSource.time;
             }
 
             return Time.time - m_RuntimeStartTime;
+        }
+
+        void SchedulePlayerMovement(double startDspTime)
+        {
+            if (!m_SchedulePlayerMovementWithMusic || m_RhythmPlayerMover == null)
+            {
+                return;
+            }
+
+            m_RhythmPlayerMover.ScheduleMovementStart(startDspTime);
+        }
+
+        void StartPlayerMovementNow()
+        {
+            if (!m_SchedulePlayerMovementWithMusic || m_RhythmPlayerMover == null)
+            {
+                return;
+            }
+
+            m_RhythmPlayerMover.StartMovement();
+        }
+
+        void StopPlayerMovement()
+        {
+            if (!m_SchedulePlayerMovementWithMusic || m_RhythmPlayerMover == null)
+            {
+                return;
+            }
+
+            m_RhythmPlayerMover.StopMovement();
         }
 
         float GetHitTimeForBeat(int beatIndex)
@@ -419,7 +525,7 @@ namespace HyperCasual.Runner
             for (int i = 0; i < beatCount; i++)
             {
                 int beatIndex = m_StartBeatIndex + m_BeatsBeforeHit + i;
-                float forwardOffset = m_PreSpawnStartDistance + m_PreSpawnBeatSpacing * i;
+                float forwardOffset = GetPreSpawnForwardOffset(beatIndex);
 
                 if (!SpawnPreSpawnBeat(beatIndex, forwardOffset))
                 {
@@ -467,7 +573,7 @@ namespace HyperCasual.Runner
             for (int i = 0; i < beatCount; i++)
             {
                 int beatIndex = m_StartBeatIndex + m_BeatsBeforeHit + i;
-                float forwardOffset = m_PreSpawnStartDistance + m_PreSpawnBeatSpacing * i;
+                float forwardOffset = GetPreSpawnForwardOffset(beatIndex);
                 DrawPreviewBeat(beatIndex, forwardOffset);
             }
 
@@ -568,6 +674,26 @@ namespace HyperCasual.Runner
             }
 
             return m_LanePattern != null ? m_LanePattern.Length : 0;
+        }
+
+        float GetPreSpawnForwardOffset(int beatIndex)
+        {
+            if (!m_UseBeatTimingForPreSpawnLayout)
+            {
+                int firstBeatIndex = m_StartBeatIndex + m_BeatsBeforeHit;
+                int localBeatIndex = Mathf.Max(0, beatIndex - firstBeatIndex);
+                return m_PreSpawnStartDistance + m_PreSpawnBeatSpacing * localBeatIndex;
+            }
+
+            float hitTime = GetHitTimeForBeat(beatIndex);
+            return Mathf.Max(0.0f, hitTime * GetPreSpawnForwardSpeed());
+        }
+
+        float GetPreSpawnForwardSpeed()
+        {
+            return m_RhythmPlayerMover != null
+                ? m_RhythmPlayerMover.ForwardSpeed
+                : m_PreSpawnForwardSpeed;
         }
 
         void SpawnKeyObject(GameObject prefab, RhythmKeyIndicator indicator, Vector3 spawnPosition, float songTime, int beatIndex)

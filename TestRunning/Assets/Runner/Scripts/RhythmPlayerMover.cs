@@ -42,6 +42,10 @@ namespace HyperCasual.Runner
         [SerializeField, Min(0.01f)]
         float m_HeightMoveSpeed = 4.0f;
 
+        [Header("Timing")]
+        [SerializeField]
+        bool m_MoveOnStart = true;
+
         [Header("Followers")]
         [SerializeField]
         bool m_MoveFollowersWithPlayer = true;
@@ -50,10 +54,22 @@ namespace HyperCasual.Runner
         Follower[] m_Followers;
 
         Transform m_Transform;
+        double m_ScheduledStartDspTime;
+        double m_LastMovementDspTime;
+        bool m_CanMove;
+        bool m_HasScheduledStart;
+        bool m_HasRuntimeMovementState;
+        bool m_UseDspDeltaTime;
+
+        public float ForwardSpeed => m_ForwardSpeed;
 
         void Awake()
         {
             m_Transform = transform;
+            if (!m_HasRuntimeMovementState)
+            {
+                m_CanMove = m_MoveOnStart;
+            }
         }
 
         void OnValidate()
@@ -70,6 +86,40 @@ namespace HyperCasual.Runner
             }
         }
 
+        public void ScheduleMovementStart(double startDspTime)
+        {
+            m_ScheduledStartDspTime = startDspTime;
+            m_LastMovementDspTime = startDspTime;
+            m_HasScheduledStart = true;
+            m_CanMove = false;
+            m_UseDspDeltaTime = true;
+            m_HasRuntimeMovementState = true;
+        }
+
+        public void StartMovement()
+        {
+            m_HasScheduledStart = false;
+            m_CanMove = true;
+            m_UseDspDeltaTime = false;
+            m_HasRuntimeMovementState = true;
+        }
+
+        public void StopMovement()
+        {
+            m_HasScheduledStart = false;
+            m_CanMove = false;
+            m_UseDspDeltaTime = false;
+            m_HasRuntimeMovementState = true;
+        }
+
+        public void CancelScheduledStart()
+        {
+            m_HasScheduledStart = false;
+            m_CanMove = m_MoveOnStart;
+            m_UseDspDeltaTime = false;
+            m_HasRuntimeMovementState = true;
+        }
+
         void Update()
         {
             if (m_Transform == null)
@@ -77,9 +127,13 @@ namespace HyperCasual.Runner
                 m_Transform = transform;
             }
 
+            if (!TryGetMovementDeltaTime(out float deltaTime))
+            {
+                return;
+            }
+
             Vector3 previousPosition = m_Transform.position;
             Vector3 nextPosition = previousPosition;
-            float deltaTime = Time.deltaTime;
 
             nextPosition.z += m_ForwardSpeed * deltaTime;
             nextPosition.x = Mathf.MoveTowards(
@@ -94,6 +148,39 @@ namespace HyperCasual.Runner
             Vector3 delta = nextPosition - previousPosition;
             m_Transform.position = nextPosition;
             MoveFollowers(delta);
+        }
+
+        bool TryGetMovementDeltaTime(out float deltaTime)
+        {
+            deltaTime = 0.0f;
+            double currentDspTime = AudioSettings.dspTime;
+
+            if (m_HasScheduledStart)
+            {
+                if (currentDspTime < m_ScheduledStartDspTime)
+                {
+                    return false;
+                }
+
+                m_HasScheduledStart = false;
+                m_CanMove = true;
+                m_LastMovementDspTime = m_ScheduledStartDspTime;
+            }
+
+            if (!m_CanMove)
+            {
+                return false;
+            }
+
+            if (m_UseDspDeltaTime)
+            {
+                deltaTime = Mathf.Max(0.0f, (float)(currentDspTime - m_LastMovementDspTime));
+                m_LastMovementDspTime = currentDspTime;
+                return true;
+            }
+
+            deltaTime = Time.deltaTime;
+            return true;
         }
 
         float GetTargetY()

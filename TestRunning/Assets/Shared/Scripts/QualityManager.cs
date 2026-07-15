@@ -23,7 +23,10 @@ namespace HyperCasual.Runner
             {
                 m_QualityLevel = value;
                 if (QualitySettings.GetQualityLevel() != m_QualityLevel)
+                {
                     QualitySettings.SetQualityLevel(m_QualityLevel, true);
+                    FrameRateLimiter.Apply();
+                }
             }
         }
 
@@ -33,6 +36,8 @@ namespace HyperCasual.Runner
                 QualityLevel = SaveManager.Instance.QualityLevel;
             else
                 QualityLevel = 2;
+
+            FrameRateLimiter.Apply();
         }
 
         void OnDisable()
