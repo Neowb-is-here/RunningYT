@@ -3,10 +3,13 @@ using UnityEngine;
 namespace HyperCasual.Runner
 {
     /// <summary>
-    /// Plays music and spawns rhythm keys so they reach indicators on BPM beats.
+    /// Plays music and spawns static rhythm keys on BPM beats.
     /// </summary>
     public class RhythmBeatSpawner : MonoBehaviour
     {
+        const string k_DefaultKeyLayerName = "keys";
+        const string k_DefaultKeyLayerNamePascal = "Keys";
+
         [System.Serializable]
         class BeatPatternStep
         {
@@ -15,6 +18,9 @@ namespace HyperCasual.Runner
             public Transform SpawnPoint;
             public bool OverrideSpawnZ;
             public float SpawnZ;
+            [Min(1)]
+            public int KeyCount = 1;
+            public Vector3 CopyOffset;
         }
 
         [Header("Music")]
@@ -62,6 +68,9 @@ namespace HyperCasual.Runner
         [SerializeField]
         Transform m_KeyParent;
 
+        [SerializeField, Tooltip("Leave spawned keys in world space so they do not inherit movement from a parent that follows the player.")]
+        bool m_KeepSpawnedKeysWorldLocked = true;
+
         [SerializeField, Min(0.0f)]
         float m_FallbackSpawnDistance = 12.0f;
 
@@ -77,7 +86,29 @@ namespace HyperCasual.Runner
         [SerializeField, Min(0.0f)]
         float m_ResolveDistance = 0.05f;
 
+        [Header("Pre Spawn")]
+        [SerializeField, Tooltip("Spawn the full configured pattern when rhythm starts, then leave the keys static on the track.")]
+        bool m_PreSpawnOnStart;
+
+        [SerializeField, Min(0), Tooltip("How many beat rows to pre-spawn. Use 0 to use the active pattern length.")]
+        int m_PreSpawnBeatCount;
+
+        [SerializeField, Min(0.0f), Tooltip("Distance from each indicator to the first pre-spawned beat row.")]
+        float m_PreSpawnStartDistance = 12.0f;
+
+        [SerializeField, Min(0.01f), Tooltip("Distance between pre-spawned beat rows. For BPM synced placement, use player forward speed * 60 / BPM.")]
+        float m_PreSpawnBeatSpacing = 2.0f;
+
+        [SerializeField, Min(1), Tooltip("How many copies to spawn on the same beat when a detailed pattern step does not override it.")]
+        int m_DefaultKeyCount = 1;
+
+        [SerializeField, Tooltip("Offset applied between copies spawned on the same beat. Use 0.6 on X to match the indicator spacing.")]
+        Vector3 m_DefaultCopyOffset = new Vector3(0.6f, 0.0f, 0.0f);
+
         [Header("Pattern")]
+        [SerializeField, Tooltip("Optional chord pattern. Use one digit per indicator: 1001 spawns first and last lanes, 0110 spawns the two middle lanes.")]
+        string[] m_ChordPattern;
+
         [SerializeField, Tooltip("Optional detailed pattern. If this has entries, each beat can choose its indicator, prefab, spawn point, and spawn Z.")]
         BeatPatternStep[] m_BeatPattern;
 
@@ -86,6 +117,16 @@ namespace HyperCasual.Runner
 
         [SerializeField]
         bool m_LoopPattern = true;
+
+        [Header("Scene Preview")]
+        [SerializeField, Tooltip("Draw the configured pattern in the Scene view while this spawner is selected.")]
+        bool m_DrawPatternPreview = true;
+
+        [SerializeField, Min(0.01f)]
+        float m_PreviewMarkerSize = 0.25f;
+
+        [SerializeField]
+        Color m_PreviewMarkerColor = new Color(0.0f, 0.85f, 1.0f, 0.85f);
 
         int m_NextHitBeatIndex;
         int m_SpawnedBeatCount;
@@ -120,11 +161,26 @@ namespace HyperCasual.Runner
             m_MaxSpawnedBeats = Mathf.Max(0, m_MaxSpawnedBeats);
             m_FallbackSpawnDistance = Mathf.Max(0.0f, m_FallbackSpawnDistance);
             m_ResolveDistance = Mathf.Max(0.0f, m_ResolveDistance);
+            m_PreSpawnBeatCount = Mathf.Max(0, m_PreSpawnBeatCount);
+            m_PreSpawnStartDistance = Mathf.Max(0.0f, m_PreSpawnStartDistance);
+            m_PreSpawnBeatSpacing = Mathf.Max(0.01f, m_PreSpawnBeatSpacing);
+            m_DefaultKeyCount = Mathf.Max(1, m_DefaultKeyCount);
+            m_PreviewMarkerSize = Mathf.Max(0.01f, m_PreviewMarkerSize);
 
             if (m_FallbackSpawnDirection.sqrMagnitude <= 0.0f)
             {
                 m_FallbackSpawnDirection = Vector3.forward;
             }
+        }
+
+        void OnDrawGizmosSelected()
+        {
+            if (Application.isPlaying)
+            {
+                return;
+            }
+
+            DrawPatternPreview();
         }
 
         void Update()
@@ -154,6 +210,12 @@ namespace HyperCasual.Runner
         {
             ResetSpawnSchedule();
             m_IsRunning = true;
+
+            if (m_PreSpawnOnStart)
+            {
+                PreSpawnKeys();
+                m_HasFinishedPattern = true;
+            }
 
             if (m_PlayMusicWhenStarted)
             {
@@ -270,6 +332,11 @@ namespace HyperCasual.Runner
 
         bool SpawnKeyForBeat(int beatIndex, float songTime)
         {
+            if (HasChordPattern())
+            {
+                return SpawnChordForBeat(beatIndex, songTime, 0.0f);
+            }
+
             BeatPatternStep step = GetBeatPatternStep(beatIndex);
             if (HasDetailedPattern() && step == null)
             {
@@ -277,6 +344,30 @@ namespace HyperCasual.Runner
             }
 
             int laneIndex = step != null ? Mathf.Clamp(step.IndicatorIndex, 0, m_Indicators.Length - 1) : GetLaneIndex(beatIndex);
+            return SpawnKeysInLane(laneIndex, step, songTime, beatIndex, 0.0f);
+        }
+
+        bool SpawnChordForBeat(int beatIndex, float songTime, float forwardOffset)
+        {
+            string chord = GetChordPatternStep(beatIndex);
+            if (chord == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < chord.Length && i < m_Indicators.Length; i++)
+            {
+                if (IsChordLaneEnabled(chord[i]) && !SpawnKeysInLane(i, null, songTime, beatIndex, forwardOffset))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        bool SpawnKeysInLane(int laneIndex, BeatPatternStep step, float songTime, int beatIndex, float forwardOffset)
+        {
             RhythmKeyIndicator indicator = GetIndicator(laneIndex);
             GameObject prefab = GetPrefab(laneIndex, step);
             if (indicator == null || prefab == null)
@@ -284,11 +375,209 @@ namespace HyperCasual.Runner
                 return false;
             }
 
-            Vector3 spawnPosition = GetSpawnPosition(laneIndex, indicator.transform, step);
-            GameObject keyObject = Instantiate(prefab, spawnPosition, prefab.transform.rotation);
-            if (m_KeyParent != null)
+            Vector3 spawnPosition = GetSpawnPosition(laneIndex, indicator.transform, step, forwardOffset);
+            int keyCount = GetKeyCount(step);
+            Vector3 copyOffset = GetCopyOffset(step);
+
+            for (int i = 0; i < keyCount; i++)
             {
-                keyObject.transform.SetParent(m_KeyParent);
+                SpawnKeyObject(prefab, indicator, spawnPosition + copyOffset * i, songTime, beatIndex);
+            }
+
+            return true;
+        }
+
+        string GetChordPatternStep(int beatIndex)
+        {
+            if (!HasChordPattern())
+            {
+                return null;
+            }
+
+            int patternIndex = GetPatternIndex(beatIndex, m_ChordPattern.Length);
+            if (patternIndex < 0)
+            {
+                return null;
+            }
+
+            return m_ChordPattern[patternIndex];
+        }
+
+        bool IsChordLaneEnabled(char laneValue)
+        {
+            return laneValue == '1' || laneValue == 'x' || laneValue == 'X';
+        }
+
+        void PreSpawnKeys()
+        {
+            int beatCount = GetPreSpawnBeatCount();
+            if (beatCount <= 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < beatCount; i++)
+            {
+                int beatIndex = m_StartBeatIndex + m_BeatsBeforeHit + i;
+                float forwardOffset = m_PreSpawnStartDistance + m_PreSpawnBeatSpacing * i;
+
+                if (!SpawnPreSpawnBeat(beatIndex, forwardOffset))
+                {
+                    m_HasFinishedPattern = true;
+                    return;
+                }
+
+                m_SpawnedBeatCount++;
+            }
+        }
+
+        bool SpawnPreSpawnBeat(int beatIndex, float forwardOffset)
+        {
+            if (HasChordPattern())
+            {
+                return SpawnChordForBeat(beatIndex, 0.0f, forwardOffset);
+            }
+
+            BeatPatternStep step = GetBeatPatternStep(beatIndex);
+            if (HasDetailedPattern() && step == null)
+            {
+                return false;
+            }
+
+            int laneIndex = step != null ? Mathf.Clamp(step.IndicatorIndex, 0, m_Indicators.Length - 1) : GetLaneIndex(beatIndex);
+            return SpawnKeysInLane(laneIndex, step, 0.0f, beatIndex, forwardOffset);
+        }
+
+        void DrawPatternPreview()
+        {
+            if (!m_DrawPatternPreview || m_Indicators == null || m_Indicators.Length == 0)
+            {
+                return;
+            }
+
+            int beatCount = GetPreSpawnBeatCount();
+            if (beatCount <= 0)
+            {
+                return;
+            }
+
+            Color previousColor = Gizmos.color;
+            Gizmos.color = m_PreviewMarkerColor;
+
+            for (int i = 0; i < beatCount; i++)
+            {
+                int beatIndex = m_StartBeatIndex + m_BeatsBeforeHit + i;
+                float forwardOffset = m_PreSpawnStartDistance + m_PreSpawnBeatSpacing * i;
+                DrawPreviewBeat(beatIndex, forwardOffset);
+            }
+
+            Gizmos.color = previousColor;
+        }
+
+        void DrawPreviewBeat(int beatIndex, float forwardOffset)
+        {
+            if (HasChordPattern())
+            {
+                string chord = GetChordPatternStep(beatIndex);
+                if (string.IsNullOrEmpty(chord))
+                {
+                    return;
+                }
+
+                for (int i = 0; i < chord.Length && i < m_Indicators.Length; i++)
+                {
+                    if (IsChordLaneEnabled(chord[i]))
+                    {
+                        DrawPreviewKeysInLane(i, null, forwardOffset);
+                    }
+                }
+
+                return;
+            }
+
+            BeatPatternStep step = GetBeatPatternStep(beatIndex);
+            if (HasDetailedPattern())
+            {
+                if (step == null)
+                {
+                    return;
+                }
+
+                int laneIndex = Mathf.Clamp(step.IndicatorIndex, 0, m_Indicators.Length - 1);
+                DrawPreviewKeysInLane(laneIndex, step, forwardOffset);
+                return;
+            }
+
+            if (m_LanePattern == null || m_LanePattern.Length == 0)
+            {
+                return;
+            }
+
+            DrawPreviewKeysInLane(GetLaneIndex(beatIndex), null, forwardOffset);
+        }
+
+        void DrawPreviewKeysInLane(int laneIndex, BeatPatternStep step, float forwardOffset)
+        {
+            RhythmKeyIndicator indicator = GetIndicator(laneIndex);
+            if (indicator == null)
+            {
+                return;
+            }
+
+            Vector3 spawnPosition = GetSpawnPosition(laneIndex, indicator.transform, step, forwardOffset);
+            int keyCount = GetKeyCount(step);
+            Vector3 copyOffset = GetCopyOffset(step);
+
+            for (int i = 0; i < keyCount; i++)
+            {
+                DrawPreviewMarker(spawnPosition + copyOffset * i);
+            }
+        }
+
+        void DrawPreviewMarker(Vector3 position)
+        {
+            Vector3 size = Vector3.one * m_PreviewMarkerSize;
+            Gizmos.DrawWireCube(position, size);
+        }
+
+        int GetPreSpawnBeatCount()
+        {
+            if (m_PreSpawnBeatCount > 0)
+            {
+                return m_PreSpawnBeatCount;
+            }
+
+            if (m_MaxSpawnedBeats > 0)
+            {
+                return m_MaxSpawnedBeats;
+            }
+
+            return GetActivePatternLength();
+        }
+
+        int GetActivePatternLength()
+        {
+            if (HasChordPattern())
+            {
+                return m_ChordPattern.Length;
+            }
+
+            if (HasDetailedPattern())
+            {
+                return m_BeatPattern.Length;
+            }
+
+            return m_LanePattern != null ? m_LanePattern.Length : 0;
+        }
+
+        void SpawnKeyObject(GameObject prefab, RhythmKeyIndicator indicator, Vector3 spawnPosition, float songTime, int beatIndex)
+        {
+            GameObject keyObject = Instantiate(prefab, spawnPosition, prefab.transform.rotation);
+            SetKeyLayerIfAvailable(keyObject);
+
+            if (m_KeyParent != null && !m_KeepSpawnedKeysWorldLocked)
+            {
+                keyObject.transform.SetParent(m_KeyParent, true);
             }
 
             RhythmBeatSyncedKey beatKey = keyObject.GetComponent<RhythmBeatSyncedKey>();
@@ -300,7 +589,61 @@ namespace HyperCasual.Runner
             float hitTime = GetHitTimeForBeat(beatIndex);
             float spawnTime = Mathf.Min(songTime, hitTime);
             beatKey.Initialize(indicator, m_AudioSource, spawnTime, hitTime, m_ResolveDistance);
-            return true;
+        }
+
+        void SetKeyLayerIfAvailable(GameObject keyObject)
+        {
+            if (keyObject == null)
+            {
+                return;
+            }
+
+            int keyLayer = LayerMask.NameToLayer(k_DefaultKeyLayerName);
+            if (keyLayer == -1)
+            {
+                keyLayer = LayerMask.NameToLayer(k_DefaultKeyLayerNamePascal);
+            }
+
+            if (keyLayer == -1)
+            {
+                return;
+            }
+
+            SetLayerRecursively(keyObject.transform, keyLayer);
+        }
+
+        void SetLayerRecursively(Transform target, int layer)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            target.gameObject.layer = layer;
+            for (int i = 0; i < target.childCount; i++)
+            {
+                SetLayerRecursively(target.GetChild(i), layer);
+            }
+        }
+
+        int GetKeyCount(BeatPatternStep step)
+        {
+            if (step != null && step.KeyCount > 0)
+            {
+                return step.KeyCount;
+            }
+
+            return Mathf.Max(1, m_DefaultKeyCount);
+        }
+
+        Vector3 GetCopyOffset(BeatPatternStep step)
+        {
+            if (step != null && step.CopyOffset != Vector3.zero)
+            {
+                return step.CopyOffset;
+            }
+
+            return m_DefaultCopyOffset;
         }
 
         BeatPatternStep GetBeatPatternStep(int beatIndex)
@@ -322,6 +665,11 @@ namespace HyperCasual.Runner
         bool HasDetailedPattern()
         {
             return m_BeatPattern != null && m_BeatPattern.Length > 0;
+        }
+
+        bool HasChordPattern()
+        {
+            return m_ChordPattern != null && m_ChordPattern.Length > 0;
         }
 
         int GetLaneIndex(int beatIndex)
@@ -399,12 +747,16 @@ namespace HyperCasual.Runner
             return null;
         }
 
-        Vector3 GetSpawnPosition(int laneIndex, Transform indicatorTransform, BeatPatternStep step)
+        Vector3 GetSpawnPosition(int laneIndex, Transform indicatorTransform, BeatPatternStep step, float forwardOffset)
         {
             Vector3 spawnPosition;
             if (step != null && step.SpawnPoint != null)
             {
                 spawnPosition = step.SpawnPoint.position;
+            }
+            else if (forwardOffset > 0.0f)
+            {
+                spawnPosition = indicatorTransform.position;
             }
             else
             {
@@ -418,6 +770,11 @@ namespace HyperCasual.Runner
             else if (m_OverrideSpawnZ)
             {
                 spawnPosition.z = m_SpawnZ;
+            }
+
+            if (forwardOffset > 0.0f)
+            {
+                spawnPosition += m_FallbackSpawnDirection.normalized * forwardOffset;
             }
 
             return spawnPosition;

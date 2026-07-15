@@ -3,19 +3,10 @@ using UnityEngine;
 namespace HyperCasual.Runner
 {
     /// <summary>
-    /// Moves a spawned key so it reaches its indicator on a target song beat.
+    /// Marks a beat-spawned key that stays in place until an indicator resolves it.
     /// </summary>
     public class RhythmBeatSyncedKey : MonoBehaviour
     {
-        RhythmKeyIndicator m_Indicator;
-        AudioSource m_AudioSource;
-        Vector3 m_StartPosition;
-        float m_SpawnSongTime;
-        float m_HitSongTime;
-        float m_ResolveDistance;
-        float m_FallbackStartTime;
-        bool m_IsResolved;
-
         public void Initialize(
             RhythmKeyIndicator indicator,
             AudioSource audioSource,
@@ -23,46 +14,20 @@ namespace HyperCasual.Runner
             float hitSongTime,
             float resolveDistance)
         {
-            m_Indicator = indicator;
-            m_AudioSource = audioSource;
-            m_StartPosition = transform.position;
-            m_SpawnSongTime = spawnSongTime;
-            m_HitSongTime = hitSongTime;
-            m_ResolveDistance = Mathf.Max(0.0f, resolveDistance);
-            m_FallbackStartTime = Time.time - spawnSongTime;
-            m_IsResolved = false;
-
             ConfigurePhysics();
         }
 
-        void Update()
+        void Awake()
         {
-            if (m_IsResolved || m_Indicator == null)
-            {
-                return;
-            }
-
-            float songTime = GetSongTime();
-            float travelDuration = Mathf.Max(0.0001f, m_HitSongTime - m_SpawnSongTime);
-            float normalizedTime = Mathf.Clamp01((songTime - m_SpawnSongTime) / travelDuration);
-
-            transform.position = Vector3.Lerp(m_StartPosition, m_Indicator.transform.position, normalizedTime);
-
-            if (songTime >= m_HitSongTime || Vector3.Distance(transform.position, m_Indicator.transform.position) <= m_ResolveDistance)
-            {
-                m_IsResolved = true;
-                m_Indicator.ResolveKey(gameObject);
-            }
+            ConfigurePhysics();
         }
 
-        float GetSongTime()
+        void OnEnable()
         {
-            if (m_AudioSource != null && m_AudioSource.clip != null)
+            if (Application.isPlaying)
             {
-                return m_AudioSource.time;
+                ConfigurePhysics();
             }
-
-            return Time.time - m_FallbackStartTime;
         }
 
         void ConfigurePhysics()
