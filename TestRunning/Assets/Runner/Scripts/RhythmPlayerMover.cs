@@ -6,8 +6,22 @@ namespace HyperCasual.Runner
     /// <summary>
     /// Moves the rhythm player rig forward through static rhythm keys.
     /// </summary>
+    [RequireComponent(typeof(Rigidbody))]
     public class RhythmPlayerMover : MonoBehaviour
     {
+        public enum LaneTarget
+        {
+            Center,
+            Left,
+            Right
+        }
+
+        public enum HeightTarget
+        {
+            Standing,
+            Shift
+        }
+
         [System.Serializable]
         class Follower
         {
@@ -42,6 +56,10 @@ namespace HyperCasual.Runner
         [SerializeField, Min(0.01f)]
         float m_HeightMoveSpeed = 4.0f;
 
+        [Header("Input")]
+        [SerializeField]
+        bool m_AllowKeyboardInput = true;
+
         [Header("Timing")]
         [SerializeField]
         bool m_MoveOnStart = true;
@@ -60,16 +78,27 @@ namespace HyperCasual.Runner
         bool m_HasScheduledStart;
         bool m_HasRuntimeMovementState;
         bool m_UseDspDeltaTime;
+        bool m_HasExternalLaneTarget;
+        bool m_HasExternalHeightTarget;
+        LaneTarget m_ExternalLaneTarget = LaneTarget.Center;
+        HeightTarget m_ExternalHeightTarget = HeightTarget.Standing;
 
         public float ForwardSpeed => m_ForwardSpeed;
 
         void Awake()
         {
             m_Transform = transform;
+            ConfigurePhysicsBody();
+
             if (!m_HasRuntimeMovementState)
             {
                 m_CanMove = m_MoveOnStart;
             }
+        }
+
+        void Reset()
+        {
+            ConfigurePhysicsBody();
         }
 
         void OnValidate()
@@ -83,6 +112,12 @@ namespace HyperCasual.Runner
                 float leftSnapX = m_RightSnapX;
                 m_RightSnapX = m_LeftSnapX;
                 m_LeftSnapX = leftSnapX;
+            }
+
+            Rigidbody playerRigidbody = GetComponent<Rigidbody>();
+            if (playerRigidbody != null)
+            {
+                ConfigurePhysicsBody(playerRigidbody);
             }
         }
 
@@ -118,6 +153,50 @@ namespace HyperCasual.Runner
             m_CanMove = m_MoveOnStart;
             m_UseDspDeltaTime = false;
             m_HasRuntimeMovementState = true;
+        }
+
+        public void SetLaneTarget(LaneTarget laneTarget)
+        {
+            m_ExternalLaneTarget = laneTarget;
+            m_HasExternalLaneTarget = true;
+        }
+
+        public void ClearLaneTarget()
+        {
+            m_HasExternalLaneTarget = false;
+        }
+
+        public void ClearLaneTarget(LaneTarget laneTarget)
+        {
+            if (m_HasExternalLaneTarget && m_ExternalLaneTarget == laneTarget)
+            {
+                ClearLaneTarget();
+            }
+        }
+
+        public void SetHeightTarget(HeightTarget heightTarget)
+        {
+            m_ExternalHeightTarget = heightTarget;
+            m_HasExternalHeightTarget = true;
+        }
+
+        public void ClearHeightTarget()
+        {
+            m_HasExternalHeightTarget = false;
+        }
+
+        public void ClearHeightTarget(HeightTarget heightTarget)
+        {
+            if (m_HasExternalHeightTarget && m_ExternalHeightTarget == heightTarget)
+            {
+                ClearHeightTarget();
+            }
+        }
+
+        public void ClearExternalTargets()
+        {
+            ClearLaneTarget();
+            ClearHeightTarget();
         }
 
         void Update()
@@ -185,6 +264,16 @@ namespace HyperCasual.Runner
 
         float GetTargetY()
         {
+            if (m_HasExternalHeightTarget)
+            {
+                return m_ExternalHeightTarget == HeightTarget.Shift ? m_LeftShiftY : m_StandingY;
+            }
+
+            if (!m_AllowKeyboardInput)
+            {
+                return m_StandingY;
+            }
+
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.leftShiftKey.isPressed)
             {
@@ -196,6 +285,16 @@ namespace HyperCasual.Runner
 
         float GetTargetX()
         {
+            if (m_HasExternalLaneTarget)
+            {
+                return GetLaneTargetX(m_ExternalLaneTarget);
+            }
+
+            if (!m_AllowKeyboardInput)
+            {
+                return m_CenterSnapX;
+            }
+
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
@@ -211,6 +310,36 @@ namespace HyperCasual.Runner
             }
 
             return moveLeft ? m_LeftSnapX : m_RightSnapX;
+        }
+
+        float GetLaneTargetX(LaneTarget laneTarget)
+        {
+            switch (laneTarget)
+            {
+                case LaneTarget.Left:
+                    return m_LeftSnapX;
+                case LaneTarget.Right:
+                    return m_RightSnapX;
+                default:
+                    return m_CenterSnapX;
+            }
+        }
+
+        void ConfigurePhysicsBody()
+        {
+            Rigidbody playerRigidbody = GetComponent<Rigidbody>();
+            if (playerRigidbody == null)
+            {
+                playerRigidbody = gameObject.AddComponent<Rigidbody>();
+            }
+
+            ConfigurePhysicsBody(playerRigidbody);
+        }
+
+        void ConfigurePhysicsBody(Rigidbody playerRigidbody)
+        {
+            playerRigidbody.isKinematic = true;
+            playerRigidbody.useGravity = false;
         }
 
         void MoveFollowers(Vector3 delta)
