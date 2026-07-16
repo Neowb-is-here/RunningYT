@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -53,6 +54,18 @@ namespace HyperCasual.Runner
         [SerializeField, Tooltip("If a Rhythm Player Mover is assigned, hold movement until the scheduled music start time.")]
         bool m_SchedulePlayerMovementWithMusic = true;
 
+        [SerializeField, Tooltip("Wait briefly before scheduling the music so scene rendering, shader, and occlusion warm-up work happens before rhythm timing starts.")]
+        bool m_WaitForSceneWarmup = true;
+
+        [SerializeField, Min(0)]
+        int m_WarmupFrames = 4;
+
+        [SerializeField, Min(0.0f)]
+        float m_WarmupSeconds = 0.25f;
+
+        [SerializeField, Tooltip("Optional heavier startup warm-up. Enable only if the first notes still hitch because it can pause before music starts.")]
+        bool m_WarmupAllShadersBeforeStart;
+
         [Header("Beat Timing")]
         [SerializeField, Min(1.0f)]
         float m_Bpm = 120.0f;
@@ -97,7 +110,7 @@ namespace HyperCasual.Runner
         [SerializeField]
         float m_SpawnZ;
 
-        [SerializeField, Min(0.0f)]
+        [SerializeField, Min(0.0f), Tooltip("Backup resolve radius for skipped trigger frames. Keep this small, usually 0.05 to 0.2.")]
         float m_ResolveDistance = 0.05f;
 
         [Header("Pre Spawn")]
@@ -157,6 +170,7 @@ namespace HyperCasual.Runner
         float m_RuntimeStartTime;
         float m_ScheduledSongTimeOffset;
         double m_ScheduledStartDspTime;
+        Coroutine m_StartRhythmCoroutine;
         bool m_UseDspSongTime;
         bool m_HasFinishedPattern;
         bool m_IsRunning;
@@ -186,6 +200,8 @@ namespace HyperCasual.Runner
             m_Bpm = Mathf.Max(1.0f, m_Bpm);
             m_MusicVolume = Mathf.Max(0.0f, m_MusicVolume);
             m_MusicStartDelay = Mathf.Max(0.0f, m_MusicStartDelay);
+            m_WarmupFrames = Mathf.Max(0, m_WarmupFrames);
+            m_WarmupSeconds = Mathf.Max(0.0f, m_WarmupSeconds);
             m_BeatsBeforeHit = Mathf.Max(0, m_BeatsBeforeHit);
             m_StartBeatIndex = Mathf.Max(0, m_StartBeatIndex);
             m_MaxSpawnedBeats = Mathf.Max(0, m_MaxSpawnedBeats);
@@ -214,6 +230,11 @@ namespace HyperCasual.Runner
             DrawPatternPreview();
         }
 
+        void OnDisable()
+        {
+            StopPendingStart();
+        }
+
         void Update()
         {
             if (!m_IsRunning || !CanSpawn())
@@ -239,6 +260,58 @@ namespace HyperCasual.Runner
 
         public void StartRhythm()
         {
+            StopPendingStart();
+            ResolveRhythmPlayerMover();
+
+            if (Application.isPlaying && ShouldWaitForWarmup())
+            {
+                StopPlayerMovement();
+                m_StartRhythmCoroutine = StartCoroutine(StartRhythmAfterWarmup());
+                return;
+            }
+
+            StartRhythmNow();
+        }
+
+        IEnumerator StartRhythmAfterWarmup()
+        {
+            if (m_WarmupAllShadersBeforeStart)
+            {
+                Shader.WarmupAllShaders();
+            }
+
+            int waitedFrames = 0;
+            float startedAt = Time.realtimeSinceStartup;
+
+            while (waitedFrames < m_WarmupFrames || Time.realtimeSinceStartup - startedAt < m_WarmupSeconds)
+            {
+                waitedFrames++;
+                yield return null;
+            }
+
+            m_StartRhythmCoroutine = null;
+            StartRhythmNow();
+        }
+
+        bool ShouldWaitForWarmup()
+        {
+            return m_WaitForSceneWarmup &&
+                (m_WarmupFrames > 0 || m_WarmupSeconds > 0.0f || m_WarmupAllShadersBeforeStart);
+        }
+
+        void StopPendingStart()
+        {
+            if (m_StartRhythmCoroutine == null)
+            {
+                return;
+            }
+
+            StopCoroutine(m_StartRhythmCoroutine);
+            m_StartRhythmCoroutine = null;
+        }
+
+        void StartRhythmNow()
+        {
             ResolveRhythmPlayerMover();
             ResetSpawnSchedule();
             m_IsRunning = true;
@@ -263,6 +336,7 @@ namespace HyperCasual.Runner
 
         public void StopRhythm()
         {
+            StopPendingStart();
             m_IsRunning = false;
             StopMusic();
             StopPlayerMovement();
