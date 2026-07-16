@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: NeonPrismLines
+  m_Shader: {fileID: 4800000, guid: b5a9349d2bd049b6bfc8d96020d4ee56, type: 3}
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 1
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3000
+  stringTagMap:
+    RenderType: Transparent
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _EmissionIntensity: 0
+    - _GlassAlpha: 0
+    - _LineSoftness: 0.01
+    - _LineWidth: 0.001
+    - _PatternScale: 4.5
+    - _RimIntensity: 1.8
+    - _RimPower: 8
+    - _ScrollSpeed: 0.18
+    m_Colors:
+    - _BaseTint: {r: 0.04, g: 0.015, b: 0.1, a: 0.2}
+    - _LineColorA: {r: 0, g: 1.0171889, b: 1.39772, a: 1}
+    - _LineColorB: {r: 0.9221513, g: 0, b: 0.63729835, a: 1}
+    - _LineColorC: {r: 2.2, g: 1.65, b: 0, a: 1}
+    - _LineColorD: {r: 0.35, g: 0.45, b: 2.4, a: 1}
+  m_BuildTextureStacks: []
