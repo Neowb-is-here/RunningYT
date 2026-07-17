@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -28,6 +29,18 @@ namespace HyperCasual.Runner
             public Transform Target;
             public bool FollowLateralMovement;
             public bool FollowVerticalMovement;
+        }
+
+        struct DebugLineMarker
+        {
+            public Vector3 Center;
+            public float CreatedAt;
+
+            public DebugLineMarker(Vector3 center, float createdAt)
+            {
+                Center = center;
+                CreatedAt = createdAt;
+            }
         }
 
         [Header("Movement")]
@@ -71,6 +84,40 @@ namespace HyperCasual.Runner
         [SerializeField]
         Follower[] m_Followers;
 
+        [Header("Debug Marker")]
+        [SerializeField, Tooltip("Press Space during Play Mode to place a Scene view gizmo line at the player's current position.")]
+        bool m_EnableSpaceDebugLine = true;
+
+        [SerializeField, Tooltip("When enabled, pressing Space toggles pause while using the debug marker tool.")]
+        bool m_CanPauseWithSpace;
+
+        [SerializeField, Tooltip("Pause AudioListener audio together with Time.timeScale so the song also stops while paused.")]
+        bool m_PauseAudioListenerWithGame = true;
+
+        [SerializeField, Tooltip("Offset from the player position used when placing each debug line.")]
+        Vector3 m_DebugLineOffset;
+
+        [SerializeField, Tooltip("Extra world Z offset from the player position used when placing each debug line.")]
+        float m_DebugLineZOffset;
+
+        [SerializeField, Min(0.01f), Tooltip("Half the width of each debug line. The full line width is this value multiplied by 2.")]
+        float m_DebugLineHalfWidth = 3.0f;
+
+        [SerializeField, Min(0.01f)]
+        float m_DebugLineCenterRadius = 0.08f;
+
+        [SerializeField, Min(1)]
+        int m_MaxDebugLineCount = 32;
+
+        [SerializeField, Min(0.0f), Tooltip("Seconds before a debug line disappears. Use 0 to keep markers until Backspace or Play Mode stops.")]
+        float m_DebugLineLifetime;
+
+        [SerializeField]
+        Color m_DebugLineColor = new Color(0.0f, 1.0f, 1.0f, 1.0f);
+
+        [SerializeField]
+        bool m_DrawDebugLinesOnlyWhenSelected;
+
         Transform m_Transform;
         double m_ScheduledStartDspTime;
         double m_LastMovementDspTime;
@@ -82,6 +129,10 @@ namespace HyperCasual.Runner
         bool m_HasExternalHeightTarget;
         LaneTarget m_ExternalLaneTarget = LaneTarget.Center;
         HeightTarget m_ExternalHeightTarget = HeightTarget.Standing;
+        readonly List<DebugLineMarker> m_DebugLineMarkers = new List<DebugLineMarker>();
+        bool m_IsPausedByDebugTool;
+        float m_TimeScaleBeforeDebugPause = 1.0f;
+        bool m_AudioListenerPauseBeforeDebugPause;
 
         public float ForwardSpeed => m_ForwardSpeed;
 
@@ -106,6 +157,10 @@ namespace HyperCasual.Runner
             m_ForwardSpeed = Mathf.Max(0.0f, m_ForwardSpeed);
             m_LaneMoveSpeed = Mathf.Max(0.01f, m_LaneMoveSpeed);
             m_HeightMoveSpeed = Mathf.Max(0.01f, m_HeightMoveSpeed);
+            m_DebugLineHalfWidth = Mathf.Max(0.01f, m_DebugLineHalfWidth);
+            m_DebugLineCenterRadius = Mathf.Max(0.01f, m_DebugLineCenterRadius);
+            m_MaxDebugLineCount = Mathf.Max(1, m_MaxDebugLineCount);
+            m_DebugLineLifetime = Mathf.Max(0.0f, m_DebugLineLifetime);
 
             if (m_LeftSnapX > m_RightSnapX)
             {
@@ -206,6 +261,14 @@ namespace HyperCasual.Runner
                 m_Transform = transform;
             }
 
+            UpdateSpaceDebugLineInput();
+            RemoveExpiredDebugLines();
+
+            if (m_IsPausedByDebugTool)
+            {
+                return;
+            }
+
             if (!TryGetMovementDeltaTime(out float deltaTime))
             {
                 return;
@@ -227,6 +290,166 @@ namespace HyperCasual.Runner
             Vector3 delta = nextPosition - previousPosition;
             m_Transform.position = nextPosition;
             MoveFollowers(delta);
+        }
+
+        void OnDisable()
+        {
+            if (m_IsPausedByDebugTool)
+            {
+                SetDebugPause(false);
+            }
+        }
+
+        void OnDrawGizmos()
+        {
+            if (m_DrawDebugLinesOnlyWhenSelected)
+            {
+                return;
+            }
+
+            DrawDebugLineGizmos();
+        }
+
+        void OnDrawGizmosSelected()
+        {
+            if (!m_DrawDebugLinesOnlyWhenSelected)
+            {
+                return;
+            }
+
+            DrawDebugLineGizmos();
+        }
+
+        void UpdateSpaceDebugLineInput()
+        {
+            if (!m_EnableSpaceDebugLine && !m_CanPauseWithSpace)
+            {
+                return;
+            }
+
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null)
+            {
+                return;
+            }
+
+            if (keyboard.spaceKey.wasPressedThisFrame)
+            {
+                if (m_EnableSpaceDebugLine)
+                {
+                    AddDebugLineMarker();
+                }
+
+                if (m_CanPauseWithSpace)
+                {
+                    SetDebugPause(!m_IsPausedByDebugTool);
+                }
+            }
+
+            if (keyboard.backspaceKey.wasPressedThisFrame)
+            {
+                m_DebugLineMarkers.Clear();
+            }
+        }
+
+        void SetDebugPause(bool pause)
+        {
+            if (pause)
+            {
+                if (m_IsPausedByDebugTool)
+                {
+                    return;
+                }
+
+                m_TimeScaleBeforeDebugPause = Time.timeScale;
+                m_AudioListenerPauseBeforeDebugPause = AudioListener.pause;
+                Time.timeScale = 0.0f;
+
+                if (m_PauseAudioListenerWithGame)
+                {
+                    AudioListener.pause = true;
+                }
+
+                m_IsPausedByDebugTool = true;
+                return;
+            }
+
+            if (!m_IsPausedByDebugTool)
+            {
+                return;
+            }
+
+            Time.timeScale = m_TimeScaleBeforeDebugPause;
+
+            if (m_PauseAudioListenerWithGame)
+            {
+                AudioListener.pause = m_AudioListenerPauseBeforeDebugPause;
+            }
+
+            double currentDspTime = AudioSettings.dspTime;
+            if (m_HasScheduledStart && currentDspTime >= m_ScheduledStartDspTime)
+            {
+                m_ScheduledStartDspTime = currentDspTime;
+                m_LastMovementDspTime = currentDspTime;
+            }
+            else if (m_UseDspDeltaTime)
+            {
+                m_LastMovementDspTime = currentDspTime;
+            }
+
+            m_IsPausedByDebugTool = false;
+        }
+
+        void AddDebugLineMarker()
+        {
+            Transform markerTransform = m_Transform != null ? m_Transform : transform;
+            m_DebugLineMarkers.Add(new DebugLineMarker(
+                markerTransform.position + m_DebugLineOffset + Vector3.forward * m_DebugLineZOffset,
+                Time.time));
+
+            while (m_DebugLineMarkers.Count > m_MaxDebugLineCount)
+            {
+                m_DebugLineMarkers.RemoveAt(0);
+            }
+        }
+
+        void RemoveExpiredDebugLines()
+        {
+            if (m_DebugLineLifetime <= 0.0f || m_DebugLineMarkers.Count == 0)
+            {
+                return;
+            }
+
+            float oldestAllowedTime = Time.time - m_DebugLineLifetime;
+            for (int i = m_DebugLineMarkers.Count - 1; i >= 0; i--)
+            {
+                if (m_DebugLineMarkers[i].CreatedAt < oldestAllowedTime)
+                {
+                    m_DebugLineMarkers.RemoveAt(i);
+                }
+            }
+        }
+
+        void DrawDebugLineGizmos()
+        {
+            if (!m_EnableSpaceDebugLine || m_DebugLineMarkers.Count == 0)
+            {
+                return;
+            }
+
+            Color previousColor = Gizmos.color;
+            Gizmos.color = m_DebugLineColor;
+
+            for (int i = 0; i < m_DebugLineMarkers.Count; i++)
+            {
+                Vector3 center = m_DebugLineMarkers[i].Center;
+                Gizmos.DrawLine(
+                    center + Vector3.left * m_DebugLineHalfWidth,
+                    center + Vector3.right * m_DebugLineHalfWidth);
+                Gizmos.DrawWireSphere(center, m_DebugLineCenterRadius);
+            }
+
+            Gizmos.color = previousColor;
         }
 
         bool TryGetMovementDeltaTime(out float deltaTime)

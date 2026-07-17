@@ -131,7 +131,7 @@ namespace HyperCasual.Runner
                 return;
             }
 
-            SpawnDisappearEffect(keyObject.transform.position, keyObject.transform.rotation);
+            SpawnDisappearEffect(transform.position, keyObject.transform.rotation);
             PlayResolveSoundOnce(keyObject);
             PlayImpactShake();
 

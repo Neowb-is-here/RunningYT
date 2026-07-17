@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -159,6 +160,15 @@ namespace HyperCasual.Runner
         [SerializeField, Tooltip("Draw the configured pattern in the Scene view while this spawner is selected.")]
         bool m_DrawPatternPreview = true;
 
+        [SerializeField, Tooltip("When enabled, only draw the pattern preview while this spawner is selected.")]
+        bool m_DrawPatternPreviewOnlyWhenSelected = true;
+
+        [SerializeField, Tooltip("Draw the pattern preview during Play Mode too. Useful when pausing the song to place notes.")]
+        bool m_DrawPatternPreviewInPlayMode = true;
+
+        [SerializeField, Tooltip("In Play Mode, keep the preview anchored to the indicator/spawn positions from rhythm start instead of following moving player objects.")]
+        bool m_LockPatternPreviewInPlayMode = true;
+
         [SerializeField, Min(0.01f)]
         float m_PreviewMarkerSize = 0.25f;
 
@@ -174,6 +184,8 @@ namespace HyperCasual.Runner
         bool m_UseDspSongTime;
         bool m_HasFinishedPattern;
         bool m_IsRunning;
+        bool m_HasRuntimePatternPreviewAnchors;
+        readonly Dictionary<Transform, Vector3> m_RuntimePatternPreviewAnchors = new Dictionary<Transform, Vector3>();
 
         float SecondsPerBeat => 60.0f / m_Bpm;
 
@@ -220,9 +232,29 @@ namespace HyperCasual.Runner
             }
         }
 
+        void OnDrawGizmos()
+        {
+            if (m_DrawPatternPreviewOnlyWhenSelected)
+            {
+                return;
+            }
+
+            DrawPatternPreviewIfAllowed();
+        }
+
         void OnDrawGizmosSelected()
         {
-            if (Application.isPlaying)
+            if (!m_DrawPatternPreviewOnlyWhenSelected)
+            {
+                return;
+            }
+
+            DrawPatternPreviewIfAllowed();
+        }
+
+        void DrawPatternPreviewIfAllowed()
+        {
+            if (Application.isPlaying && !m_DrawPatternPreviewInPlayMode)
             {
                 return;
             }
@@ -233,6 +265,7 @@ namespace HyperCasual.Runner
         void OnDisable()
         {
             StopPendingStart();
+            ClearRuntimePatternPreviewAnchors();
         }
 
         void Update()
@@ -314,6 +347,7 @@ namespace HyperCasual.Runner
         {
             ResolveRhythmPlayerMover();
             ResetSpawnSchedule();
+            CacheRuntimePatternPreviewAnchors();
             m_IsRunning = true;
 
             if (m_PreSpawnOnStart)
@@ -704,7 +738,7 @@ namespace HyperCasual.Runner
                 return;
             }
 
-            Vector3 spawnPosition = GetSpawnPosition(laneIndex, indicator.transform, step, forwardOffset);
+            Vector3 spawnPosition = GetPreviewSpawnPosition(laneIndex, indicator.transform, step, forwardOffset);
             int keyCount = GetKeyCount(step);
             Vector3 copyOffset = GetCopyOffset(step);
 
@@ -718,6 +752,92 @@ namespace HyperCasual.Runner
         {
             Vector3 size = Vector3.one * m_PreviewMarkerSize;
             Gizmos.DrawWireCube(position, size);
+        }
+
+        void CacheRuntimePatternPreviewAnchors()
+        {
+            if (!Application.isPlaying || !m_LockPatternPreviewInPlayMode)
+            {
+                return;
+            }
+
+            m_RuntimePatternPreviewAnchors.Clear();
+
+            if (m_Indicators != null)
+            {
+                for (int i = 0; i < m_Indicators.Length; i++)
+                {
+                    if (m_Indicators[i] != null)
+                    {
+                        CachePatternPreviewAnchor(m_Indicators[i].transform);
+                    }
+                }
+            }
+
+            if (m_SpawnPoints != null)
+            {
+                for (int i = 0; i < m_SpawnPoints.Length; i++)
+                {
+                    CachePatternPreviewAnchor(m_SpawnPoints[i]);
+                }
+            }
+
+            if (m_BeatPattern != null)
+            {
+                for (int i = 0; i < m_BeatPattern.Length; i++)
+                {
+                    if (m_BeatPattern[i] != null)
+                    {
+                        CachePatternPreviewAnchor(m_BeatPattern[i].SpawnPoint);
+                    }
+                }
+            }
+
+            m_HasRuntimePatternPreviewAnchors = true;
+        }
+
+        void CachePatternPreviewAnchor(Transform anchor)
+        {
+            if (anchor == null || m_RuntimePatternPreviewAnchors.ContainsKey(anchor))
+            {
+                return;
+            }
+
+            m_RuntimePatternPreviewAnchors.Add(anchor, anchor.position);
+        }
+
+        void ClearRuntimePatternPreviewAnchors()
+        {
+            m_RuntimePatternPreviewAnchors.Clear();
+            m_HasRuntimePatternPreviewAnchors = false;
+        }
+
+        Vector3 GetPatternPreviewAnchorPosition(Transform anchor)
+        {
+            if (anchor == null)
+            {
+                return Vector3.zero;
+            }
+
+            if (!Application.isPlaying || !m_LockPatternPreviewInPlayMode)
+            {
+                return anchor.position;
+            }
+
+            if (!m_HasRuntimePatternPreviewAnchors)
+            {
+                CacheRuntimePatternPreviewAnchors();
+            }
+
+            if (m_RuntimePatternPreviewAnchors.TryGetValue(anchor, out Vector3 cachedPosition))
+            {
+                return cachedPosition;
+            }
+
+            CachePatternPreviewAnchor(anchor);
+            return m_RuntimePatternPreviewAnchors.TryGetValue(anchor, out cachedPosition)
+                ? cachedPosition
+                : anchor.position;
         }
 
         int GetPreSpawnBeatCount()
@@ -980,6 +1100,41 @@ namespace HyperCasual.Runner
             return spawnPosition;
         }
 
+        Vector3 GetPreviewSpawnPosition(int laneIndex, Transform indicatorTransform, BeatPatternStep step, float forwardOffset)
+        {
+            Vector3 indicatorPosition = GetPatternPreviewAnchorPosition(indicatorTransform);
+            Vector3 spawnPosition;
+
+            if (step != null && step.SpawnPoint != null)
+            {
+                spawnPosition = GetPatternPreviewAnchorPosition(step.SpawnPoint);
+            }
+            else if (forwardOffset > 0.0f)
+            {
+                spawnPosition = indicatorPosition;
+            }
+            else
+            {
+                spawnPosition = GetDefaultPreviewSpawnPosition(laneIndex, indicatorPosition);
+            }
+
+            if (step != null && step.OverrideSpawnZ)
+            {
+                spawnPosition.z = step.SpawnZ;
+            }
+            else if (m_OverrideSpawnZ)
+            {
+                spawnPosition.z = m_SpawnZ;
+            }
+
+            if (forwardOffset > 0.0f)
+            {
+                spawnPosition += m_FallbackSpawnDirection.normalized * forwardOffset;
+            }
+
+            return spawnPosition;
+        }
+
         Vector3 GetDefaultSpawnPosition(int laneIndex, Transform indicatorTransform)
         {
             if (m_SpawnPoints != null &&
@@ -992,6 +1147,20 @@ namespace HyperCasual.Runner
 
             Vector3 direction = m_FallbackSpawnDirection.normalized;
             return indicatorTransform.position + direction * m_FallbackSpawnDistance;
+        }
+
+        Vector3 GetDefaultPreviewSpawnPosition(int laneIndex, Vector3 indicatorPosition)
+        {
+            if (m_SpawnPoints != null &&
+                laneIndex >= 0 &&
+                laneIndex < m_SpawnPoints.Length &&
+                m_SpawnPoints[laneIndex] != null)
+            {
+                return GetPatternPreviewAnchorPosition(m_SpawnPoints[laneIndex]);
+            }
+
+            Vector3 direction = m_FallbackSpawnDirection.normalized;
+            return indicatorPosition + direction * m_FallbackSpawnDistance;
         }
     }
 }
