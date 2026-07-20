@@ -144,8 +144,14 @@ namespace HyperCasual.Runner
         Vector3 m_DefaultCopyOffset = new Vector3(0.6f, 0.0f, 0.0f);
 
         [Header("Pattern")]
-        [SerializeField, Tooltip("Optional chord pattern. Use one digit per indicator: 1001 spawns first and last lanes, 0110 spawns the two middle lanes.")]
+        [SerializeField, Tooltip("Optional chord pattern. Use one character per indicator. 0 is empty. 1, 2, 3, etc. spawn a key and select Chord Character Prefabs by slot. X spawns with the lane/default prefab.")]
         string[] m_ChordPattern;
+
+        [SerializeField, Tooltip("Prefab slots used by chord pattern characters. 1 uses Element 0, 2 uses Element 1, 3 uses Element 2, etc. Leave an element empty to use the lane/default prefab.")]
+        GameObject[] m_ChordCharacterPrefabs;
+
+        [SerializeField, Tooltip("Extra Y offset applied only to keys spawned from the chord pattern. Use a negative value to lower them.")]
+        float m_ChordSpawnYOffset;
 
         [SerializeField, Tooltip("Optional detailed pattern. If this has entries, each beat can choose its indicator, prefab, spawn point, and spawn Z.")]
         BeatPatternStep[] m_BeatPattern;
@@ -571,7 +577,13 @@ namespace HyperCasual.Runner
 
             for (int i = 0; i < chord.Length && i < m_Indicators.Length; i++)
             {
-                if (IsChordLaneEnabled(chord[i]) && !SpawnKeysInLane(i, null, songTime, beatIndex, forwardOffset))
+                if (!IsChordLaneEnabled(chord[i]))
+                {
+                    continue;
+                }
+
+                GameObject prefabOverride = GetChordCharacterPrefab(chord[i]);
+                if (!SpawnKeysInLane(i, null, songTime, beatIndex, forwardOffset, prefabOverride, m_ChordSpawnYOffset))
                 {
                     return false;
                 }
@@ -580,16 +592,24 @@ namespace HyperCasual.Runner
             return true;
         }
 
-        bool SpawnKeysInLane(int laneIndex, BeatPatternStep step, float songTime, int beatIndex, float forwardOffset)
+        bool SpawnKeysInLane(
+            int laneIndex,
+            BeatPatternStep step,
+            float songTime,
+            int beatIndex,
+            float forwardOffset,
+            GameObject prefabOverride = null,
+            float yOffset = 0.0f)
         {
             RhythmKeyIndicator indicator = GetIndicator(laneIndex);
-            GameObject prefab = GetPrefab(laneIndex, step);
+            GameObject prefab = GetPrefab(laneIndex, step, prefabOverride);
             if (indicator == null || prefab == null)
             {
                 return false;
             }
 
             Vector3 spawnPosition = GetSpawnPosition(laneIndex, indicator.transform, step, forwardOffset);
+            spawnPosition.y += yOffset;
             int keyCount = GetKeyCount(step);
             Vector3 copyOffset = GetCopyOffset(step);
 
@@ -619,7 +639,28 @@ namespace HyperCasual.Runner
 
         bool IsChordLaneEnabled(char laneValue)
         {
-            return laneValue == '1' || laneValue == 'x' || laneValue == 'X';
+            return laneValue == 'x' || laneValue == 'X' || GetChordCharacterPrefabIndex(laneValue) >= 0;
+        }
+
+        int GetChordCharacterPrefabIndex(char laneValue)
+        {
+            if (laneValue >= '1' && laneValue <= '9')
+            {
+                return laneValue - '1';
+            }
+
+            return -1;
+        }
+
+        GameObject GetChordCharacterPrefab(char laneValue)
+        {
+            int prefabIndex = GetChordCharacterPrefabIndex(laneValue);
+            if (prefabIndex < 0 || m_ChordCharacterPrefabs == null || prefabIndex >= m_ChordCharacterPrefabs.Length)
+            {
+                return null;
+            }
+
+            return m_ChordCharacterPrefabs[prefabIndex];
         }
 
         void PreSpawnKeys()
@@ -702,10 +743,12 @@ namespace HyperCasual.Runner
                 {
                     if (IsChordLaneEnabled(chord[i]))
                     {
-                        DrawPreviewKeysInLane(i, null, forwardOffset);
+                        Gizmos.color = GetChordPreviewColor(chord[i], m_PreviewMarkerColor);
+                        DrawPreviewKeysInLane(i, null, forwardOffset, m_ChordSpawnYOffset);
                     }
                 }
 
+                Gizmos.color = m_PreviewMarkerColor;
                 return;
             }
 
@@ -730,7 +773,7 @@ namespace HyperCasual.Runner
             DrawPreviewKeysInLane(GetLaneIndex(beatIndex), null, forwardOffset);
         }
 
-        void DrawPreviewKeysInLane(int laneIndex, BeatPatternStep step, float forwardOffset)
+        void DrawPreviewKeysInLane(int laneIndex, BeatPatternStep step, float forwardOffset, float yOffset = 0.0f)
         {
             RhythmKeyIndicator indicator = GetIndicator(laneIndex);
             if (indicator == null)
@@ -739,6 +782,7 @@ namespace HyperCasual.Runner
             }
 
             Vector3 spawnPosition = GetPreviewSpawnPosition(laneIndex, indicator.transform, step, forwardOffset);
+            spawnPosition.y += yOffset;
             int keyCount = GetKeyCount(step);
             Vector3 copyOffset = GetCopyOffset(step);
 
@@ -752,6 +796,39 @@ namespace HyperCasual.Runner
         {
             Vector3 size = Vector3.one * m_PreviewMarkerSize;
             Gizmos.DrawWireCube(position, size);
+        }
+
+        Color GetChordPreviewColor(char laneValue, Color fallbackColor)
+        {
+            GameObject prefab = GetChordCharacterPrefab(laneValue);
+            if (prefab == null)
+            {
+                return fallbackColor;
+            }
+
+            Renderer renderer = prefab.GetComponentInChildren<Renderer>();
+            Material material = renderer != null ? renderer.sharedMaterial : null;
+            if (material == null)
+            {
+                return fallbackColor;
+            }
+
+            Color color = fallbackColor;
+            if (material.HasProperty("_BaseColor"))
+            {
+                color = material.GetColor("_BaseColor");
+            }
+            else if (material.HasProperty("_Color"))
+            {
+                color = material.GetColor("_Color");
+            }
+            else if (material.HasProperty("_EmissionColor"))
+            {
+                color = material.GetColor("_EmissionColor");
+            }
+
+            color.a = fallbackColor.a;
+            return color;
         }
 
         void CacheRuntimePatternPreviewAnchors()
@@ -1039,8 +1116,13 @@ namespace HyperCasual.Runner
             return patternIndex;
         }
 
-        GameObject GetPrefab(int laneIndex, BeatPatternStep step)
+        GameObject GetPrefab(int laneIndex, BeatPatternStep step, GameObject prefabOverride = null)
         {
+            if (prefabOverride != null)
+            {
+                return prefabOverride;
+            }
+
             if (step != null && step.KeyPrefab != null)
             {
                 return step.KeyPrefab;

@@ -62,9 +62,20 @@ namespace HyperCasual.Runner
         [SerializeField, Min(0.0f)]
         float m_ShakeStrength = 0.06f;
 
+        [Header("Combo")]
+        [SerializeField]
+        bool m_AddComboOnResolve = true;
+
+        [SerializeField]
+        RhythmComboCounter m_ComboCounter;
+
+        [SerializeField, Min(0)]
+        int m_ComboAddAmount = 1;
+
         Coroutine m_ShakeCoroutine;
         Vector3 m_ShakeBaseLocalPosition;
         readonly HashSet<int> m_KeysWithResolveSoundPlayed = new HashSet<int>();
+        readonly HashSet<int> m_KeysWithComboAdded = new HashSet<int>();
 
         public float EarlyResolveSoundDistance => m_EarlyResolveSoundDistance;
 
@@ -90,6 +101,7 @@ namespace HyperCasual.Runner
             m_ResolvePitchVariance = Mathf.Max(0.0f, m_ResolvePitchVariance);
             m_ShakeDuration = Mathf.Max(0.0f, m_ShakeDuration);
             m_ShakeStrength = Mathf.Max(0.0f, m_ShakeStrength);
+            m_ComboAddAmount = Mathf.Max(0, m_ComboAddAmount);
             SetDefaultKeyLayerMaskIfNeeded();
         }
 
@@ -134,6 +146,7 @@ namespace HyperCasual.Runner
             SpawnDisappearEffect(transform.position, keyObject.transform.rotation);
             PlayResolveSoundOnce(keyObject);
             PlayImpactShake();
+            AddComboOnce(keyObject);
 
             if (!m_DestroyKeyOnEnter)
             {
@@ -185,6 +198,32 @@ namespace HyperCasual.Runner
             }
 
             return (m_KeyLayerMask.value & (1 << keyObject.layer)) != 0;
+        }
+
+        void AddComboOnce(GameObject keyObject)
+        {
+            if (!m_AddComboOnResolve || m_ComboAddAmount <= 0)
+            {
+                return;
+            }
+
+            int keyId = keyObject.GetInstanceID();
+            if (m_KeysWithComboAdded.Contains(keyId))
+            {
+                return;
+            }
+
+            m_KeysWithComboAdded.Add(keyId);
+
+            if (m_ComboCounter == null)
+            {
+                m_ComboCounter = RhythmComboCounter.Instance;
+            }
+
+            if (m_ComboCounter != null)
+            {
+                m_ComboCounter.AddCombo(m_ComboAddAmount);
+            }
         }
 
         void SpawnDisappearEffect(Vector3 position, Quaternion rotation)

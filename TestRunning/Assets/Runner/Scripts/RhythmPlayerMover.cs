@@ -94,6 +94,9 @@ namespace HyperCasual.Runner
         [SerializeField, Tooltip("Pause AudioListener audio together with Time.timeScale so the song also stops while paused.")]
         bool m_PauseAudioListenerWithGame = true;
 
+        [SerializeField, Tooltip("If a previous debug pause left the editor time scale at 0, restore it when this player starts.")]
+        bool m_ResetDebugPauseOnEnable = true;
+
         [SerializeField, Tooltip("Offset from the player position used when placing each debug line.")]
         Vector3 m_DebugLineOffset;
 
@@ -136,6 +139,17 @@ namespace HyperCasual.Runner
 
         public float ForwardSpeed => m_ForwardSpeed;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void ResetPlaybackStateBeforeSceneLoad()
+        {
+            if (Mathf.Approximately(Time.timeScale, 0.0f))
+            {
+                Time.timeScale = 1.0f;
+            }
+
+            AudioListener.pause = false;
+        }
+
         void Awake()
         {
             m_Transform = transform;
@@ -144,6 +158,25 @@ namespace HyperCasual.Runner
             if (!m_HasRuntimeMovementState)
             {
                 m_CanMove = m_MoveOnStart;
+            }
+        }
+
+        void OnEnable()
+        {
+            if (!m_ResetDebugPauseOnEnable)
+            {
+                return;
+            }
+
+            m_IsPausedByDebugTool = false;
+            if (Mathf.Approximately(Time.timeScale, 0.0f))
+            {
+                Time.timeScale = 1.0f;
+            }
+
+            if (m_PauseAudioListenerWithGame)
+            {
+                AudioListener.pause = false;
             }
         }
 
